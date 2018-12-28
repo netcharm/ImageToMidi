@@ -6,7 +6,44 @@
         xmlns:local="clr-namespace:ImageToMidi"
         mc:Ignorable="d"
         Title="MainWindow" Height="350" Width="525">
-    <Grid>
-        
+    <Grid Width="Auto">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0">
+            <GroupBox Header="Options"  HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ComboBox Grid.Column="0" Grid.Row="0" x:Name="NoteType" Text="Note" Margin="8" SelectionChanged="NoteType_SelectionChanged" />
+                    <ComboBox Grid.Column="0" Grid.Row="1" x:Name="NoteCenter" Text="Center" Margin="8" SelectionChanged="NoteCenter_SelectionChanged" />
+                    <StackPanel Grid.Column="1" Grid.RowSpan="2" Margin="8">
+                        <RadioButton x:Name="SingleTrack" GroupName="TrackType" Content="Single Track" IsChecked="True" Margin="4" />
+                        <RadioButton x:Name="MultiTrack" GroupName="TrackType" Content="Multi Track" IsChecked="False" Margin="4" />
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" x:Name="btnLoad" Content="Load Image" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnLoad_Click"/>
+                <Button Grid.Column="1" x:Name="btnSave" Content="Save MIDI" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnSave_Click"/>
+            </Grid>
+        </Grid>
+        <Viewbox Grid.Column="1" Stretch="Uniform" StretchDirection="DownOnly">
+            <Image x:Name="image" Margin="8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Viewbox>
+
     </Grid>
 </Window>
