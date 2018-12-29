@@ -103,7 +103,7 @@ namespace ImageToMidi
                         bitmap = PixelMidi.GrayScale(bitmap);
                         if (bitmap.GetPixel(0, 0).GetBrightness() < 0.25) bitmap = PixelMidi.Invert(bitmap);
                         image.Source = PixelMidi.BitmapToImageSource(bitmap);
-                        p2m.GetMidi(bitmap);
+                        p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
                     }
                 }
             }
@@ -118,7 +118,7 @@ namespace ImageToMidi
                 bitmap = PixelMidi.GrayScale(bitmap);
                 if (bitmap.GetPixel(0, 0).GetBrightness() < 0.25) bitmap = PixelMidi.Invert(bitmap);
                 image.Source = PixelMidi.BitmapToImageSource(bitmap);
-                p2m.GetMidi(bitmap);
+                p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
             }
         }
 
@@ -134,7 +134,7 @@ namespace ImageToMidi
                         bitmap = PixelMidi.GrayScale(new System.Drawing.Bitmap(stream));
                     if (bitmap.GetPixel(0, 0).GetBrightness() < 0.25) bitmap = PixelMidi.Invert(bitmap);
                     image.Source = PixelMidi.BitmapToImageSource(bitmap);
-                    p2m.GetMidi(bitmap);
+                    p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
                 }
             }
             catch (Exception) { }
@@ -167,7 +167,7 @@ namespace ImageToMidi
                 bitmap = PixelMidi.GrayScale(PixelMidi.LoadBitmap(text));
                 image.Source = PixelMidi.BitmapToImageSource(bitmap);
 
-                p2m.GetMidi(bitmap);
+                p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
             }
         }
 
@@ -247,7 +247,7 @@ namespace ImageToMidi
             if (dlgSave.ShowDialog() == true)
             {
                 if(p2m.Music == null)
-                    p2m.GetMidi(bitmap);
+                    p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
                 p2m.Save($"{dlgSave.FileName}");
             }
         }

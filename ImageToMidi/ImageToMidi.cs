@@ -308,30 +308,32 @@ namespace ImageToMidi
                 {
                     for (int y = 0; y < gray.Height; y++)
                     {
+                        count = 0;
                         var track = new MidiTrack();
                         track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 3, 0, Encoding.Default.GetBytes($"{FileName}_{y}"))));
                         for (int x = 0; x < gray.Width; x++)
                         {
                             c = gray.GetPixel(x, y);
-                            var trans = (int)((255.0 - c.A) / 4);
-                            var velocity = (byte)(((1.0 - c.GetBrightness()) / 4.0)*255);
-                            if (trans > 0)
+                            var alpha = (int)(c.A / 4.0);
+                            if (co.R == c.R && co.G == c.G && co.B == c.B || c.GetBrightness() > 0.9) alpha = 0;
+                            var velocity = (byte)(((1.0 - c.GetBrightness()) / 2.0)*255);
+                            if (alpha > 0)
                             {
                                 var noteOn  = new MidiEvent(MidiEvent.NoteOn,  0x40, velocity, Encoding.Default.GetBytes(""));
                                 var noteOff = new MidiEvent(MidiEvent.NoteOn, 0x40, 0x00, Encoding.Default.GetBytes(""));
-                                track.AddMessage(new MidiMessage(om[x,y], noteOn));
-                                track.AddMessage(new MidiMessage());
+                                track.AddMessage(new MidiMessage(count * delta, noteOn));
                                 track.AddMessage(new MidiMessage(delta, noteOff));
-                                track.AddMessage(new MidiMessage());
+                                count = 0;
                             }
+                            else count++;
                         }
                         track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
-                        result.AddTrack(new MidiTrack());
+                        result.AddTrack(track);
                     }
                 }
             }
-
             Music = result;
+
             return (result);
         }
 
