@@ -41,6 +41,27 @@ namespace ImageToMidi
             int pixelSize  = (int) dib.Length - headerSize;
             int fileSize   = 14 + headerSize + pixelSize;
 
+            /* Get the palette size
+             * The Palette size is stored as an int32 at offset 32
+             * Actually stored as number of colours, so multiply by 4
+             */
+            dib.Position = 32;
+            int paletteSize = 4 * reader.ReadInt32();
+
+            // Get the palette size from the bbp if none was specified
+            if (paletteSize == 0)
+            {
+                /* Get the bits per pixel
+                 * The bits per pixel is store as an int16 at offset 14
+                 */
+                dib.Position = 14;
+                int bpp = reader.ReadInt16();
+
+                // Only set the palette size if the bpp < 16
+                if (bpp < 16)
+                    paletteSize = 4 * (2 << (bpp - 1));
+            }
+
             MemoryStream bmp = new MemoryStream(fileSize);
             BinaryWriter writer = new BinaryWriter(bmp);
 
@@ -49,7 +70,7 @@ namespace ImageToMidi
             writer.Write((byte)'M');
             writer.Write(fileSize);
             writer.Write((int)0);
-            writer.Write(14 + headerSize);
+            writer.Write(14 + headerSize + paletteSize);
 
             // 2. Copy the DIB 
             dib.Position = 0;
@@ -171,6 +192,7 @@ namespace ImageToMidi
             this.Icon = BitmapFrame.Create(iconUri);
 
             image.Source = this.Icon;
+            bitmap = PixelMidi.ImageSourceToBitmap(this.Icon as BitmapSource);
         }
 
         private void NoteType_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -222,8 +244,9 @@ namespace ImageToMidi
             dlgSave.FileName = $"{p2m.FileName}.mid";
             if (dlgSave.ShowDialog() == true)
             {
-                var midi = p2m.GetMidi(bitmap);
-                p2m.Save(midi, $"{dlgSave.FileName}");
+                if(p2m.Music == null)
+                    p2m.GetMidi(bitmap);
+                p2m.Save($"{dlgSave.FileName}");
             }
         }
 

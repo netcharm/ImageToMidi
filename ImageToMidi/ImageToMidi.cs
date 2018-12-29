@@ -17,6 +17,7 @@ namespace ImageToMidi
         public int NoteCenter { get; set; } = 63;
         public string FileName { get; set; } = "Untitled";
 
+        public Bitmap Source { get; set; } = null;
         public MidiMusic Music { get; set; } = null;
 
         private MidiPlayer player = null;
@@ -430,9 +431,11 @@ namespace ImageToMidi
             return (result);
         }
 
-        public bool Save(MidiMusic music, string filename)
+        public bool Save(string filename, MidiMusic music = null)
         {
             bool result = false;
+
+            if (music == null) music = Music;
 
             if (music is MidiMusic && !string.IsNullOrEmpty(filename))
             {
