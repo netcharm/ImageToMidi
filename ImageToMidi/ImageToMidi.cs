@@ -280,7 +280,7 @@ namespace ImageToMidi
 
                     var track = new MidiTrack();
                     track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 3, 0, Encoding.Default.GetBytes(FileName))));
-                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.NoteOff, (byte)offset, 0, Encoding.Default.GetBytes(""))));
+                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.NoteOff, (byte)NoteCenter, 0, Encoding.Default.GetBytes(""))));
 
                     double[] alpha = new double[128];
                     for (int x = 0; x < gray.Width; x++)
@@ -322,7 +322,7 @@ namespace ImageToMidi
                         }
                     }
                     
-                    track.AddMessage(new MidiMessage(marginR*delta, new MidiEvent(MidiEvent.NoteOff, (byte)offset, 0, Encoding.Default.GetBytes(""))));
+                    track.AddMessage(new MidiMessage(marginR*delta, new MidiEvent(MidiEvent.NoteOff, (byte)NoteCenter, 0, Encoding.Default.GetBytes(""))));
                     track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
 
                     result.AddTrack(track);
