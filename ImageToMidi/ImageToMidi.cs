@@ -20,6 +20,9 @@ namespace ImageToMidi
         public Bitmap Source { get; set; } = null;
         public MidiMusic Music { get; set; } = null;
 
+        public double FilterStrength { get; set; } = 0.80;
+        public bool InvertSource { get; set; } = false;
+
         private MidiPlayer player = null;
 
         public bool IsPlay
@@ -201,6 +204,15 @@ namespace ImageToMidi
             return (result);
         }
 
+        private double CalcAlpha(Color c, Color co, out byte velocity)
+        {
+            var brightness = c.GetBrightness();
+            var alpha = c.A / 4.0;
+            if (co.R == c.R && co.G == c.G && co.B == c.B || brightness > FilterStrength) alpha = 0;
+            velocity = (byte)(((1.0 - brightness) / 2.0) * 255);
+            return (alpha);
+        }
+
         public MidiMusic GetMidi(Bitmap bitmap, bool singleTrack = true)
         {
             MidiMusic result = null;
@@ -225,43 +237,52 @@ namespace ImageToMidi
                 result.AddTrack(track_sys);
 
                 var gray = GrayScale(bitmap.Height > 128 ? Resize(bitmap, 0, 128): bitmap);
+                if (InvertSource) gray = Invert(gray);
 
                 Color c;
                 Color co = gray.GetPixel(0,0);
                 int count = 0;
 
                 int[,] om = new int[gray.Width, gray.Height];
+                Dictionary<int[,], byte> nm = new Dictionary<int[,], byte>();
+
                 count = 0;
 
                 bool[] blank = new bool[gray.Width];
                 for (int i = 0; i < blank.Length;i++) blank[i] = true;
-
+                int marginL = 0;
+                int marginR = 0;
                 for (int x = 0; x < gray.Width; x++)
                 {
                     //for (int y = 0; y < gray.Height; y++)
                     for (int y = gray.Height - 1; y >= 0; y--)
                     {
                         c = gray.GetPixel(x, y);
-                        var alpha = (int)(c.A / 4.0);
-                        if (co.R == c.R && co.G == c.G && co.B == c.B || c.GetBrightness() > 0.9) alpha = 0;
+                        byte velocity = 0x40;
+                        var alpha  = CalcAlpha(c, co, out velocity);
                         if (alpha > 0)
                         {
                             om[x, y] = count * delta;
                             blank[x] = false;
+                            if (marginL == 0) marginL = x;
                             count = 0;
                             break;
                         }
                     }
                     if(blank[x]) count++;
                 }
+                marginR = count;
 
                 if (singleTrack)
                 {
-                    var track = new MidiTrack();
-                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 3, 0, Encoding.Default.GetBytes(FileName))));
                     int offset = (int)(NoteCenter - gray.Height / 2.0);
                     if (offset < 0) offset = 0;
-                    float[] alpha = new float[128];
+
+                    var track = new MidiTrack();
+                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 3, 0, Encoding.Default.GetBytes(FileName))));
+                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.NoteOff, (byte)offset, 0, Encoding.Default.GetBytes(""))));
+
+                    double[] alpha = new double[128];
                     for (int x = 0; x < gray.Width; x++)
                     {
                         if (blank[x]) continue;
@@ -270,9 +291,8 @@ namespace ImageToMidi
                         for (int y = gray.Height - 1; y >= 0; y--)
                         {
                             c = gray.GetPixel(x, y);
-                            alpha[y] = (int)(c.A / 4.0);
-                            if (co.R == c.R && co.G == c.G && co.B == c.B || c.GetBrightness() > 0.9) alpha[y] = 0;
-                            var velocity = (byte)(((1.0 - c.GetBrightness()) / 2.0)*255);
+                            byte velocity = 0x40;
+                            alpha[y] = CalcAlpha(c, co, out velocity);
                             if (alpha[y] > 0)
                             {
                                 var noteOn  = new MidiEvent(MidiEvent.NoteOn,  (byte)(gray.Height - y - 1 + offset), velocity, Encoding.Default.GetBytes(""));
@@ -301,7 +321,10 @@ namespace ImageToMidi
                             }
                         }
                     }
+                    
+                    track.AddMessage(new MidiMessage(marginR*delta, new MidiEvent(MidiEvent.NoteOff, (byte)offset, 0, Encoding.Default.GetBytes(""))));
                     track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
+
                     result.AddTrack(track);
                 }
                 else

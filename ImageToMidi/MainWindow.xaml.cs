@@ -101,7 +101,6 @@ namespace ImageToMidi
                     {
                         bitmap = PixelMidi.ImageSourceToBitmap(img as BitmapSource);
                         bitmap = PixelMidi.GrayScale(bitmap);
-                        if (bitmap.GetPixel(0, 0).GetBrightness() < 0.25) bitmap = PixelMidi.Invert(bitmap);
                         image.Source = PixelMidi.BitmapToImageSource(bitmap);
                         p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
                     }
@@ -116,7 +115,6 @@ namespace ImageToMidi
             {
                 bitmap = PixelMidi.ImageSourceToBitmap(source as BitmapSource);
                 bitmap = PixelMidi.GrayScale(bitmap);
-                if (bitmap.GetPixel(0, 0).GetBrightness() < 0.25) bitmap = PixelMidi.Invert(bitmap);
                 image.Source = PixelMidi.BitmapToImageSource(bitmap);
                 p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
             }
@@ -126,13 +124,12 @@ namespace ImageToMidi
         {
             try
             {
-                if(stream is Stream)
+                if (stream is Stream)
                 {
-                    if(IsDib)
+                    if (IsDib)
                         bitmap = PixelMidi.GrayScale(BitmapFromDib(stream));
                     else
                         bitmap = PixelMidi.GrayScale(new System.Drawing.Bitmap(stream));
-                    if (bitmap.GetPixel(0, 0).GetBrightness() < 0.25) bitmap = PixelMidi.Invert(bitmap);
                     image.Source = PixelMidi.BitmapToImageSource(bitmap);
                     p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
                 }
@@ -246,8 +243,7 @@ namespace ImageToMidi
             dlgSave.FileName = $"{p2m.FileName}.mid";
             if (dlgSave.ShowDialog() == true)
             {
-                if(p2m.Music == null)
-                    p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
+                p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
                 p2m.Save($"{dlgSave.FileName}");
             }
         }
@@ -376,5 +372,23 @@ namespace ImageToMidi
             }
         }
 
+        private void FilterStrength_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            p2m.FilterStrength = 1 - FilterStrength.Value;
+            //if (bitmap is System.Drawing.Bitmap && bitmap.GetPixel(0, 0).GetBrightness() < FilterStrength.Value)
+            //{
+            //    bitmap = PixelMidi.Invert(bitmap);
+            //    image.Source = PixelMidi.BitmapToImageSource(bitmap);
+            //    p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
+            //}
+        }
+
+        private void InvertImage_Click(object sender, RoutedEventArgs e)
+        {
+            p2m.InvertSource = InvertImage.IsChecked.Value;
+            if(p2m.InvertSource) image.Source = PixelMidi.BitmapToImageSource(PixelMidi.Invert(bitmap));
+            else image.Source = PixelMidi.BitmapToImageSource(bitmap);
+            p2m.GetMidi(bitmap);
+        }
     }
 }

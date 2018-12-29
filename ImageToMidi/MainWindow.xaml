@@ -23,14 +23,21 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <ComboBox Grid.Column="0" Grid.Row="0" x:Name="NoteType" Text="Note" Margin="8" SelectionChanged="NoteType_SelectionChanged" />
                     <ComboBox Grid.Column="0" Grid.Row="1" x:Name="NoteCenter" Text="Center" Margin="8" SelectionChanged="NoteCenter_SelectionChanged" />
+                    <CheckBox Grid.Column="0" Grid.Row="2" x:Name="InvertImage" Content="Invert" Margin="8" Click="InvertImage_Click" />
                     <StackPanel Grid.Column="1" Grid.RowSpan="2" Margin="8">
                         <RadioButton x:Name="SingleTrack" GroupName="TrackType" Content="Single Track" IsChecked="True" Margin="4" />
                         <RadioButton x:Name="MultiTrack" GroupName="TrackType" Content="Multi Track" IsChecked="False" Margin="4" />
+                    </StackPanel>
+                    <StackPanel Grid.ColumnSpan="2" Grid.Row="3">
+                        <TextBlock Text="Filter Strength:" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" />
+                        <Slider  x:Name="FilterStrength" Margin="4" Minimum="0.05" Maximum="0.95" Value="0.2" SmallChange="0.05" LargeChange="0.1" TickFrequency="0.1" ValueChanged="FilterStrength_ValueChanged" />
                     </StackPanel>
                 </Grid>
             </GroupBox>
