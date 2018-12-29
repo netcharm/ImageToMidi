@@ -17,6 +17,21 @@ namespace ImageToMidi
         public int NoteCenter { get; set; } = 63;
         public string FileName { get; set; } = "Untitled";
 
+        public MidiMusic Music { get; set; } = null;
+
+        private MidiPlayer player = null;
+
+        public bool IsPlay
+        {
+            get
+            {
+                if (player is MidiPlayer && player.State == PlayerState.Playing)
+                    return (true);
+                else
+                    return (false);
+            }
+        }
+
         public static Bitmap LoadBitmap(string bitmapFile)
         {
             Bitmap result = null;
@@ -45,34 +60,73 @@ namespace ImageToMidi
             else return null;
         }
 
-        public static Bitmap ToGrayScale(Bitmap Bmp)
+        public static Bitmap GrayScale(Bitmap Bmp)
         {
             Bitmap result = null;
 
-            #region BT709
-            ImageAttributes ia = new ImageAttributes();
-            ColorMatrix icm = new ColorMatrix( new[]{
-                new float[] { 0.2125f, 0.2125f, 0.2125f, 0, 0},        // red scaling factor
-                new float[] { 0.7154f, 0.7154f, 0.7154f, 0, 0},        // green scaling factor
-                new float[] { 0.0721f, 0.0721f, 0.0721f, 0, 0},        // blue scaling factor
-                new float[] {       0,       0,       0, 1, 0},        // alpha scaling factor
-                new float[] {       0,       0,       0, 0, 1}         // three translations
-            });
-            ia.SetColorMatrix(icm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-            #endregion
-
-            result = new Bitmap(Bmp.Width, Bmp.Height, Bmp.PixelFormat);
-            using (var g = Graphics.FromImage(result))
+            if (Bmp is Bitmap)
             {
-                g.SmoothingMode = SmoothingMode.HighQuality;
-                g.PixelOffsetMode = PixelOffsetMode.Half;
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                #region BT709
+                ImageAttributes ia = new ImageAttributes();
+                ColorMatrix icm = new ColorMatrix( new[]{
+                    new float[] { 0.2125f, 0.2125f, 0.2125f, 0, 0},        // red scaling factor
+                    new float[] { 0.7154f, 0.7154f, 0.7154f, 0, 0},        // green scaling factor
+                    new float[] { 0.0721f, 0.0721f, 0.0721f, 0, 0},        // blue scaling factor
+                    new float[] {       0,       0,       0, 1, 0},        // alpha scaling factor
+                    new float[] {       0,       0,       0, 0, 1}         // three translations
+                });
+                ia.SetColorMatrix(icm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+                #endregion
 
-                g.DrawImage(Bmp,
-                            new Rectangle(0, 0, Bmp.Width, Bmp.Height),
-                            0, 0, Bmp.Width, Bmp.Height,
-                            GraphicsUnit.Pixel,
-                            ia);
+                result = new Bitmap(Bmp.Width, Bmp.Height, Bmp.PixelFormat);
+                using (var g = Graphics.FromImage(result))
+                {
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.PixelOffsetMode = PixelOffsetMode.Half;
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+
+                    g.DrawImage(Bmp,
+                                new Rectangle(0, 0, Bmp.Width, Bmp.Height),
+                                0, 0, Bmp.Width, Bmp.Height,
+                                GraphicsUnit.Pixel,
+                                ia);
+                }
+            }
+
+            return ((Bitmap)result);
+        }
+
+        public static Bitmap Invert(Bitmap Bmp)
+        {
+            Bitmap result = null;
+
+            if (Bmp is Bitmap)
+            {
+                #region Invert
+                ImageAttributes ia = new ImageAttributes();
+                ColorMatrix icm = new ColorMatrix( new[]{
+                    new float[] { -1,  0,  0, 0, 0},        // red scaling factor
+                    new float[] {  0, -1,  0, 0, 0},        // green scaling factor
+                    new float[] {  0,  0, -1, 0, 0},        // blue scaling factor
+                    new float[] {  0,  0,  0, 1, 0},        // alpha scaling factor
+                    new float[] {  1,  1,  1, 0, 1}         // three translations
+                });
+                ia.SetColorMatrix(icm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+                #endregion
+
+                result = new Bitmap(Bmp.Width, Bmp.Height, Bmp.PixelFormat);
+                using (var g = Graphics.FromImage(result))
+                {
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.PixelOffsetMode = PixelOffsetMode.Half;
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+
+                    g.DrawImage(Bmp,
+                                new Rectangle(0, 0, Bmp.Width, Bmp.Height),
+                                0, 0, Bmp.Width, Bmp.Height,
+                                GraphicsUnit.Pixel,
+                                ia);
+                }
             }
 
             return ((Bitmap)result.Clone());
@@ -127,6 +181,25 @@ namespace ImageToMidi
             return (result);
         }
 
+        public static Bitmap ImageSourceToBitmap(System.Windows.Media.Imaging.BitmapSource bitmap)
+        {
+            Bitmap result = null;
+
+            if (bitmap is System.Windows.Media.Imaging.BitmapSource)
+            {
+                using (MemoryStream outStream = new MemoryStream())
+                {
+                    System.Windows.Media.Imaging.BitmapEncoder enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                    enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                    enc.Save(outStream);
+                    outStream.Seek(0, SeekOrigin.Begin);
+                    result = new Bitmap(outStream);
+                }
+            }
+
+            return (result);
+        }
+
         public MidiMusic GetMidi(Bitmap bitmap, bool singleTrack = true)
         {
             MidiMusic result = null;
@@ -150,7 +223,7 @@ namespace ImageToMidi
                 track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
                 result.AddTrack(track_sys);
 
-                var gray = ToGrayScale(bitmap.Height > 128 ? Resize(bitmap, 0, 128): bitmap);
+                var gray = GrayScale(bitmap.Height > 128 ? Resize(bitmap, 0, 128): bitmap);
 
                 Color c;
                 Color co = gray.GetPixel(0,0);
@@ -251,6 +324,7 @@ namespace ImageToMidi
                 }
             }
 
+            Music = result;
             return (result);
         }
 
@@ -289,19 +363,53 @@ namespace ImageToMidi
             return (result);
         }
 
-        public void Play(MidiMusic music)
+        public void Play(MidiMusic music = null)
         {
+            if (player is MidiPlayer) Stop();
+
             var access = MidiAccessManager.Default;
             var output = access.OpenOutputAsync(access.Outputs.Last().Id).Result;
-            var player = new MidiPlayer(music, output);
-            player.EventReceived += (MidiEvent e) => {
-                if (e.EventType == MidiEvent.Program)
-                    Console.WriteLine($"Program changed: Channel:{e.Channel} Instrument:{e.Msb}");
-            };
-            player.PlayAsync();
-            Console.WriteLine("Type [CR] to stop.");
-            Console.ReadLine();
-            player.Dispose();
+            if (music is MidiMusic)
+                player = new MidiPlayer(music, output);
+            else if (Music is MidiMusic)
+                player = new MidiPlayer(Music, output);
+            else
+                return;
+
+            if(player is MidiPlayer)
+            {
+                if(player.State == PlayerState.Stopped || player.State == PlayerState.Paused)
+                {
+                    //player.EventReceived += (MidiEvent e) => {
+                    //    if (e.EventType == MidiEvent.Program)
+                    //        Console.WriteLine($"Program changed: Channel:{e.Channel} Instrument:{e.Msb}");
+                    //};
+
+                    player.PlayAsync();
+                }
+                //Console.WriteLine("Type [CR] to stop.");
+                //Console.ReadLine();
+                //player.Dispose();
+            }
+        }
+
+        public void Stop()
+        {
+            try
+            {
+                if (player is MidiPlayer)
+                {
+                    player.PauseAsync();
+                }
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                player.Dispose();
+                player = null;
+            }
         }
 
         public static MidiMusic Load(string filename)

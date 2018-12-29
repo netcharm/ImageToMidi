@@ -5,8 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ImageToMidi"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
-    <Grid Width="Auto">
+        Title="MainWindow" 
+        Height="350" Width="525"
+        AllowDrop="True" DragOver="Window_DragOver" Drop="Window_Drop">
+    <Grid Width="Auto" >
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="200"/>
             <ColumnDefinition Width="*"/>
@@ -37,8 +39,14 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Button Grid.Column="0" x:Name="btnLoad" Content="Load Image" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnLoad_Click"/>
-                <Button Grid.Column="1" x:Name="btnSave" Content="Save MIDI" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnSave_Click"/>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Button Grid.Column="0" Grid.Row="0" x:Name="btnPaste" Content="Paste Image" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnPaste_Click" />
+                <Button Grid.Column="1" Grid.Row="0" x:Name="btnPlay" Content="Play MIDI" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnPlay_Click" Visibility="Collapsed" />
+                <Button Grid.Column="0" Grid.Row="1" x:Name="btnLoad" Content="Load Image" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnLoad_Click"/>
+                <Button Grid.Column="1" Grid.Row="1" x:Name="btnSave" Content="Save MIDI" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Width="75" Click="btnSave_Click"/>
             </Grid>
         </Grid>
         <Viewbox Grid.Column="1" Stretch="Uniform" StretchDirection="DownOnly">
