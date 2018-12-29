@@ -24,6 +24,8 @@ namespace ImageToMidi
     /// </summary>
     public partial class MainWindow : Window
     {
+        private List<string> img_exts = new List<string>() {".gif",".bmp",".png",".jpg", ".jpeg", ".tif", ".tiff" };
+
         System.Drawing.Bitmap bitmap = null;
         //Commons.Music.Midi.MidiMusic standard_midi;
         //Commons.Music.Midi.MidiMusic multinote_midi;
@@ -253,6 +255,7 @@ namespace ImageToMidi
         private void btnPaste_Click(object sender, RoutedEventArgs e)
         {
             LoadImage(Clipboard.GetImage());
+            p2m.FileName = "Untitled";
         }
 
         private void btnPlay_Click(object sender, RoutedEventArgs e)
@@ -272,10 +275,23 @@ namespace ImageToMidi
         private void Window_DragOver(object sender, DragEventArgs e)
         {
             var fmts = new List<string>(e.Data.GetFormats(true));
+            //if (fmts.Contains("FileName"))
+            //{
+            //    var link = (string[])e.Data.GetData("FileName");
+            //    if (link.Length > 0 && !string.IsNullOrEmpty(link[0]))
+            //    {
+            //        if (img_exts.Contains(System.IO.Path.GetExtension(link[0]).ToLower()))
+            //            e.Effects = DragDropEffects.Link;
+            //        else
+            //            e.Effects = DragDropEffects.None;
+            //    }                
+            //}
+            //else if(fmts.Contains("text/html"))
+            //{
+            //    e.Effects = DragDropEffects.Link;
+            //}
             if (fmts.Contains("FileName") || fmts.Contains("text/html"))
-            {
                 e.Effects = DragDropEffects.Link;
-            }
         }
 
         private void Window_Drop(object sender, DragEventArgs e)
@@ -286,6 +302,7 @@ namespace ImageToMidi
                 using (MemoryStream ms = (MemoryStream)e.Data.GetData("PNG"))
                 {
                     LoadImage(ms);
+                    p2m.FileName = "Untitled";
                 }
             }
             else if (fmts.Contains(DataFormats.Dib))
@@ -293,6 +310,7 @@ namespace ImageToMidi
                 using (MemoryStream ms = (MemoryStream)e.Data.GetData(DataFormats.Dib))
                 {
                     LoadImage(ms);
+                    p2m.FileName = "Untitled";
                 }
             }
             else if (fmts.Contains("text/html"))
@@ -311,6 +329,7 @@ namespace ImageToMidi
                             if (!string.IsNullOrEmpty(link))
                             {
                                 LoadImage(link, true);
+                                p2m.FileName = "Untitled";
                                 break;
                             }
                         }
@@ -323,6 +342,7 @@ namespace ImageToMidi
                             if (!string.IsNullOrEmpty(link))
                             {
                                 LoadImage(new Uri(link));
+                                p2m.FileName = System.IO.Path.GetFileNameWithoutExtension(link);
                                 break;
                             }
                         }
@@ -335,6 +355,7 @@ namespace ImageToMidi
                             if (!string.IsNullOrEmpty(link))
                             {
                                 LoadImage(new Uri(link));
+                                p2m.FileName = System.IO.Path.GetFileNameWithoutExtension(link);
                                 break;
                             }
                         }
@@ -346,7 +367,11 @@ namespace ImageToMidi
                 var link = (string[])e.Data.GetData("FileName");
                 if (link.Length>0 && !string.IsNullOrEmpty(link[0]))
                 {
-                    LoadImage(link[0]);
+                    if (img_exts.Contains(System.IO.Path.GetExtension(link[0]).ToLower()))
+                    {
+                        LoadImage(link[0]);
+                        p2m.FileName = System.IO.Path.GetFileNameWithoutExtension(link[0]);
+                    }
                 }
             }
         }

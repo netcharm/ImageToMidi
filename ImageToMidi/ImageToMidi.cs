@@ -232,23 +232,27 @@ namespace ImageToMidi
 
                 int[,] om = new int[gray.Width, gray.Height];
                 count = 0;
+
                 bool[] blank = new bool[gray.Width];
+                for (int i = 0; i < blank.Length;i++) blank[i] = true;
+
                 for (int x = 0; x < gray.Width; x++)
                 {
-                    for (int y = 0; y < gray.Height; y++)
+                    //for (int y = 0; y < gray.Height; y++)
+                    for (int y = gray.Height - 1; y >= 0; y--)
                     {
                         c = gray.GetPixel(x, y);
                         var alpha = (int)(c.A / 4.0);
                         if (co.R == c.R && co.G == c.G && co.B == c.B || c.GetBrightness() > 0.9) alpha = 0;
                         if (alpha > 0)
                         {
-                            om[x, y] = count * noteLen;
+                            om[x, y] = count * delta;
                             blank[x] = false;
                             count = 0;
                             break;
                         }
-                        else count++;
                     }
+                    if(blank[x]) count++;
                 }
 
                 if (singleTrack)
@@ -260,6 +264,8 @@ namespace ImageToMidi
                     float[] alpha = new float[128];
                     for (int x = 0; x < gray.Width; x++)
                     {
+                        if (blank[x]) continue;
+
                         bool IsDelta = false;
                         for (int y = gray.Height - 1; y >= 0; y--)
                         {
@@ -270,9 +276,9 @@ namespace ImageToMidi
                             if (alpha[y] > 0)
                             {
                                 var noteOn  = new MidiEvent(MidiEvent.NoteOn,  (byte)(gray.Height - y - 1 + offset), velocity, Encoding.Default.GetBytes(""));
-                                if (!blank[x] && IsDelta)
+                                if (IsDelta)
                                     track.AddMessage(new MidiMessage(0, noteOn));
-                                else if (!blank[x])
+                                else
                                 {
                                     track.AddMessage(new MidiMessage(om[x, y], noteOn));
                                     IsDelta = true;
