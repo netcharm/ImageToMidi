@@ -23,6 +23,8 @@ namespace ImageToMidi
         public double FilterStrength { get; set; } = 0.80;
         public bool InvertSource { get; set; } = false;
 
+        private static short noteLen = 0x03C0;
+
         private MidiPlayer player = null;
 
         public bool IsPlay
@@ -57,7 +59,14 @@ namespace ImageToMidi
             else return null;
         }
 
-        public static Bitmap ToIndex256(Bitmap Bmp)
+        public static Bitmap ToIndexed16(Bitmap Bmp)
+       {
+            if (Bmp is Bitmap)
+                return (Bmp.Clone(new Rectangle(0, 0, Bmp.Width, Bmp.Height), PixelFormat.Format4bppIndexed));
+            else return null;
+        }
+
+        public static Bitmap ToIndexed256(Bitmap Bmp)
         {
             if (Bmp is Bitmap)
                 return (Bmp.Clone(new Rectangle(0, 0, Bmp.Width, Bmp.Height), PixelFormat.Format8bppIndexed));
@@ -136,7 +145,7 @@ namespace ImageToMidi
             return ((Bitmap)result.Clone());
         }
 
-        public Bitmap Resize(Bitmap bitmap, int width, int height)
+        public static Bitmap Resize(Bitmap bitmap, int width, int height)
         {
             Bitmap result = null;
 
@@ -213,31 +222,125 @@ namespace ImageToMidi
             return (alpha);
         }
 
-        public MidiMusic GetMidi(Bitmap bitmap, bool singleTrack = true)
+        private enum ColorChannel { A, R, G, B }
+        public class Histogram
         {
-            MidiMusic result = null;
+            public double[] A = new double[256];
+            public double[] R = new double[256];
+            public double[] G = new double[256];
+            public double[] B = new double[256];
+        }
+
+        private Histogram GetHistogram(Bitmap bitmap, bool SplitChannel = true)
+        {
+            Histogram result = new Histogram();
+
+            Color c;
+
+            var gray = bitmap.Height > 128 ? Resize(bitmap, 0, 128): bitmap;
+            for (int x = 0; x < gray.Width; x++)
+            {
+                for (int y = gray.Height - 1; y >= 0; y--)
+                {
+                    c = gray.GetPixel(x, y);
+                    result.A[c.A]++;
+                    result.R[c.R]++;
+                    result.G[c.G]++;
+                    result.B[c.B]++;
+                }
+            }
+
+            return (result);
+        }
+
+        private Bitmap MakeHistogram(double[] channel, Color color)
+        {
+            Bitmap result = new Bitmap(256, 100, PixelFormat.Format32bppArgb);
+
+            double total = 0;
+            for (var i = 0; i < 256; i++)
+            {
+                total += channel[i];
+            }
+            double min=1, max=0;
+            double[] v = new double[256];
+            for (var i = 1; i < 256; i++)
+            {
+                v[i] = channel[i] / total;
+                min = Math.Min(min, v[i]);
+                max = Math.Max(max, v[i]);
+            }
+            double factor = 100 / (max - min);
+
+            //result.SetPixel(0, 0, color);
+            for (var i = 1; i < 256; i++)
+            {
+                int iv = 100 - (int)(v[i] * factor);
+                if (iv < 0) iv = 0;
+                if (iv > 99) iv = 99;
+                result.SetPixel(i, iv, color);
+            }
+
+            return (result);
+        }
+
+        private Bitmap MakeHistogram(Histogram histogram)
+        {
+            Bitmap result = new Bitmap(256, 100, PixelFormat.Format32bppArgb);
+
+            //var A = MakeHistogram(histogram.A, Color.White);
+            var R = MakeHistogram(histogram.R, Color.Red);
+            var G = MakeHistogram(histogram.G, Color.Green);
+            var B = MakeHistogram(histogram.B, Color.Blue);
+
+            using (Graphics g = Graphics.FromImage(result))
+            {
+                //g.DrawImage(A, 0, 0);
+                g.DrawImage(R, 0, 0);
+                g.DrawImage(G, 0, 0);
+                g.DrawImage(B, 0, 0);
+            }
+
+            return (result);
+        }
+
+        private MidiTrack GetMetaTrack(string name)
+        {
+            var track = new MidiTrack();
+            // Sequence or track name
+            track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x03, 0, Encoding.Default.GetBytes(name))));
+            // Copyright notice
+            track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x02, 0, Encoding.Default.GetBytes("Copyright 2018 NetCharm"))));
+            // Text event
+            track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x01, 0, Encoding.Default.GetBytes("NetCharm"))));
+            // Instrument name
+            //track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x04, 0, Encoding.Default.GetBytes("Piano"))));
+            // Time signature
+            track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x58, 0, Encoding.Default.GetBytes("\x04\x02\x18\x08"))));
+            // Key signature
+            track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x59, 0, Encoding.Default.GetBytes("\x00\x00"))));
+            // Tempo setting (us/quarter-note)
+            track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x51, 0, Encoding.Default.GetBytes("\x07\xA1\x20")))); // 120  beats/minute
+                                                                                                                                         //track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x51, 0, Encoding.Default.GetBytes("\x09\x27\xC0")))); // 100  beats/minute
+                                                                                                                                         // End of track
+            track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
+
+            return (track);
+        }
+
+        private MidiTrack GetPixelTrack(Bitmap bitmap, string name, bool grayscale = true, bool invert=true)
+        {
+            MidiTrack result = null;
 
             if (bitmap is Bitmap)
             {
-                result = new MidiMusic();
+                result = new MidiTrack();
 
-                short noteLen = 0x03C0;
                 int delta = (int)(noteLen * NoteType);
-                result.DeltaTimeSpec = noteLen;
-                result.Format = 1;
 
-                var track_sys = new MidiTrack();
-                track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x03, 0, Encoding.Default.GetBytes(FileName))));
-                track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x02, 0, Encoding.Default.GetBytes("Copyright 2018 NetCharm"))));
-                track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x01, 0, Encoding.Default.GetBytes("NetCharm"))));
-                track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x58, 0, Encoding.Default.GetBytes("\x04\x02\x18\x08"))));
-                track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x59, 0, Encoding.Default.GetBytes("\x00\x00"))));
-                track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x51, 0, Encoding.Default.GetBytes("\x09\x27\xC0"))));
-                track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
-                result.AddTrack(track_sys);
-
-                var gray = GrayScale(bitmap.Height > 128 ? Resize(bitmap, 0, 128): bitmap);
-                if (InvertSource) gray = Invert(gray);
+                var gray = bitmap.Height > 128 ? Resize(bitmap, 0, 128): bitmap;
+                gray = grayscale ? GrayScale(gray) : gray;
+                if (InvertSource && invert) gray = Invert(gray);
 
                 Color c;
                 Color co = gray.GetPixel(0,0);
@@ -249,7 +352,7 @@ namespace ImageToMidi
                 count = 0;
 
                 bool[] blank = new bool[gray.Width];
-                for (int i = 0; i < blank.Length;i++) blank[i] = true;
+                for (int i = 0; i < blank.Length; i++) blank[i] = true;
                 int marginL = 0;
                 int marginR = 0;
                 for (int x = 0; x < gray.Width; x++)
@@ -259,7 +362,7 @@ namespace ImageToMidi
                     {
                         c = gray.GetPixel(x, y);
                         byte velocity = 0x40;
-                        var alpha  = CalcAlpha(c, co, out velocity);
+                        var alpha = CalcAlpha(c, co, out velocity);
                         if (alpha > 0)
                         {
                             om[x, y] = count * delta;
@@ -269,77 +372,134 @@ namespace ImageToMidi
                             break;
                         }
                     }
-                    if(blank[x]) count++;
+                    if (blank[x]) count++;
                 }
                 marginR = count;
 
-                if (singleTrack)
+                //int offset = (int)(gray.Height / 2.0 - NoteCenter);
+                int offset = (int)(NoteCenter - gray.Height / 2.0);
+                if (offset < 0) offset = 0;
+
+                var track = new MidiTrack();
+                track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x03, 0, Encoding.Default.GetBytes(name))));
+                track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.NoteOff, (byte)NoteCenter, 0, Encoding.Default.GetBytes(""))));
+
+                double[] alphav = new double[128];
+                for (int x = 0; x < gray.Width; x++)
                 {
-                    int offset = (int)(NoteCenter - gray.Height / 2.0);
-                    if (offset < 0) offset = 0;
+                    if (blank[x]) continue;
 
-                    var track = new MidiTrack();
-                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 3, 0, Encoding.Default.GetBytes(FileName))));
-                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.NoteOff, (byte)NoteCenter, 0, Encoding.Default.GetBytes(""))));
-
-                    double[] alpha = new double[128];
-                    for (int x = 0; x < gray.Width; x++)
+                    bool IsDelta = false;
+                    for (int y = gray.Height - 1; y >= 0; y--)
                     {
-                        if (blank[x]) continue;
-
-                        bool IsDelta = false;
-                        for (int y = gray.Height - 1; y >= 0; y--)
+                        c = gray.GetPixel(x, y);
+                        byte velocity = 0x40;
+                        alphav[y] = CalcAlpha(c, co, out velocity);
+                        if (alphav[y] > 0)
                         {
-                            c = gray.GetPixel(x, y);
-                            byte velocity = 0x40;
-                            alpha[y] = CalcAlpha(c, co, out velocity);
-                            if (alpha[y] > 0)
+                            var noteOn  = new MidiEvent(MidiEvent.NoteOn,  (byte)(gray.Height - y - 1 + offset), velocity, Encoding.Default.GetBytes(""));
+                            if (IsDelta)
+                                track.AddMessage(new MidiMessage(0, noteOn));
+                            else
                             {
-                                var noteOn  = new MidiEvent(MidiEvent.NoteOn,  (byte)(gray.Height - y - 1 + offset), velocity, Encoding.Default.GetBytes(""));
-                                if (IsDelta)
-                                    track.AddMessage(new MidiMessage(0, noteOn));
-                                else
-                                {
-                                    track.AddMessage(new MidiMessage(om[x, y], noteOn));
-                                    IsDelta = true;
-                                }
-                            }
-                        }
-                        IsDelta = false;
-                        for (int y = 0; y < gray.Height; y++)
-                        {
-                            if (alpha[y] > 0)
-                            {
-                                var noteOff = new MidiEvent(MidiEvent.NoteOn, (byte)(gray.Height - y - 1 + offset), 0x00, Encoding.Default.GetBytes(""));
-                                if (IsDelta)
-                                    track.AddMessage(new MidiMessage(0, noteOff));
-                                else
-                                {
-                                    track.AddMessage(new MidiMessage(delta, noteOff));
-                                    IsDelta = true;
-                                }
+                                track.AddMessage(new MidiMessage(om[x, y], noteOn));
+                                IsDelta = true;
                             }
                         }
                     }
-                    
-                    track.AddMessage(new MidiMessage(marginR*delta, new MidiEvent(MidiEvent.NoteOff, (byte)NoteCenter, 0, Encoding.Default.GetBytes(""))));
-                    track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
+                    IsDelta = false;
+                    for (int y = 0; y < gray.Height; y++)
+                    {
+                        if (alphav[y] > 0)
+                        {
+                            var noteOff = new MidiEvent(MidiEvent.NoteOn, (byte)(gray.Height - y - 1 + offset), 0x00, Encoding.Default.GetBytes(""));
+                            if (IsDelta)
+                                track.AddMessage(new MidiMessage(0, noteOff));
+                            else
+                            {
+                                track.AddMessage(new MidiMessage(delta, noteOff));
+                                IsDelta = true;
+                            }
+                        }
+                    }
+                }
 
+                track.AddMessage(new MidiMessage(marginR * delta, new MidiEvent(MidiEvent.NoteOff, (byte)NoteCenter, 0, Encoding.Default.GetBytes(""))));
+                track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
+
+                result = track;
+            }
+
+            return (result);
+        }
+
+        /// <summary>
+        /// 
+        /// -----------------------
+        /// Type    Event
+        /// -----------------------
+        /// 0x00    Sequence number
+        /// 0x01    Text event
+        /// 0x02    Copyright notice
+        /// 0x03    Sequence or track name
+        /// 0x04    Instrument name
+        /// 0x05    Lyric text
+        /// 0x06    Marker text
+        /// 0x07    Cue point
+        /// 0x20    MIDI channel prefix assignment
+        /// 0x2F    End of track
+        /// 0x51    Tempo setting
+        /// 0x54    SMPTE offset
+        /// 0x58    Time signature
+        /// 0x59    Key signature
+        /// 0x7F    Sequencer specific event
+        /// -----------------------
+        /// 
+        /// 
+        /// </summary>
+        /// <param name="bitmap"></param>
+        /// <param name="singleTrack"></param>
+        /// <returns></returns>
+        public MidiMusic GetPixelMidi(Bitmap bitmap, bool singleTrack = true)
+        {
+            MidiMusic result = null;
+
+            if (bitmap is Bitmap)
+            {
+                int delta = (int)(noteLen * NoteType);
+
+                result = new MidiMusic();
+                result.DeltaTimeSpec = noteLen;
+                result.Format = 1;
+
+                var track_sys = GetMetaTrack(FileName);
+                result.AddTrack(track_sys);
+
+                if (singleTrack)
+                {
+                    var track = GetPixelTrack(bitmap, FileName);
                     result.AddTrack(track);
                 }
                 else
                 {
+                    var gray = GrayScale(bitmap.Height > 128 ? Resize(bitmap, 0, 128): bitmap);
+                    if (InvertSource) gray = Invert(gray);
+
+                    Color c;
+                    Color co = gray.GetPixel(0,0);
+                    int count = 0;
+
                     for (int y = 0; y < gray.Height; y++)
                     {
                         count = 0;
                         var track = new MidiTrack();
-                        track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 3, 0, Encoding.Default.GetBytes($"{FileName}_{y}"))));
+                        track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x00, 0, Encoding.Default.GetBytes($"{y}"))));
+                        track.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x03, 0, Encoding.Default.GetBytes($"{FileName}_{y}"))));
                         for (int x = 0; x < gray.Width; x++)
                         {
                             c = gray.GetPixel(x, y);
-                            var alpha = (int)(c.A / 4.0);
-                            if (co.R == c.R && co.G == c.G && co.B == c.B || c.GetBrightness() > 0.9) alpha = 0;
-                            var velocity = (byte)(((1.0 - c.GetBrightness()) / 2.0)*255);
+                            byte velocity = 0x40;
+                            var alpha = CalcAlpha(c, co, out velocity);
                             if (alpha > 0)
                             {
                                 var noteOn  = new MidiEvent(MidiEvent.NoteOn,  0x40, velocity, Encoding.Default.GetBytes(""));
@@ -360,7 +520,58 @@ namespace ImageToMidi
             return (result);
         }
 
-        public MidiMusic DemoMidi()
+        public MidiMusic GetHistogramMidi(Bitmap bitmap, bool singleTrack = true)
+        {
+            MidiMusic result = null;
+
+            if (bitmap is Bitmap)
+            {
+                var lastNoteCenter = NoteCenter;
+                NoteCenter = 63;
+
+                int delta = (int)(noteLen * NoteType);
+
+                result = new MidiMusic();
+                result.DeltaTimeSpec = noteLen;
+                result.Format = 1;
+
+                var track_sys = GetMetaTrack(FileName);
+                result.AddTrack(track_sys);
+
+                var histogram = GetHistogram(bitmap, true);
+
+                if (singleTrack)
+                {
+                    var hist = MakeHistogram(histogram);
+                    var track = GetPixelTrack(hist, $"{FileName}_Histogram", false, false);
+                    if(track is MidiTrack) result.AddTrack(track);
+                }
+                else
+                {
+                    var hist_a = MakeHistogram(histogram.A, Color.White );
+                    var hist_r = MakeHistogram(histogram.R, Color.Red );
+                    var hist_g = MakeHistogram(histogram.G, Color.Green );
+                    var hist_b = MakeHistogram(histogram.B, Color.Blue );
+
+                    var track_a = GetPixelTrack(hist_a, $"{FileName}_Histogram_A", false, false);
+                    var track_r = GetPixelTrack(hist_r, $"{FileName}_Histogram_R", false, false);
+                    var track_g = GetPixelTrack(hist_g, $"{FileName}_Histogram_G", false, false);
+                    var track_b = GetPixelTrack(hist_b, $"{FileName}_Histogram_B", false, false);
+
+                    if (track_a is MidiTrack) result.AddTrack(track_a);
+                    if (track_r is MidiTrack) result.AddTrack(track_r);
+                    if (track_g is MidiTrack) result.AddTrack(track_g);
+                    if (track_b is MidiTrack) result.AddTrack(track_b);
+                }
+                NoteCenter = lastNoteCenter;
+
+                Music = result;
+            }
+
+            return (result);
+        }
+
+        public MidiMusic DemoPixelMidi()
         {
             MidiMusic result = new MidiMusic();
 
@@ -369,14 +580,7 @@ namespace ImageToMidi
             result.DeltaTimeSpec = noteLen;
             result.Format = 1;
 
-            var track_sys = new MidiTrack();
-            track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x03, 0, Encoding.Default.GetBytes("Demo"))));
-            track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x02, 0, Encoding.Default.GetBytes("Copyright 2018 NetCharm"))));
-            track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x01, 0, Encoding.Default.GetBytes("NetCharm"))));
-            track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x58, 0, Encoding.Default.GetBytes("\x04\x02\x18\x08"))));
-            track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x59, 0, Encoding.Default.GetBytes("\x00\x00"))));
-            track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x51, 0, Encoding.Default.GetBytes("\x09\x27\xC0"))));
-            track_sys.AddMessage(new MidiMessage(0, new MidiEvent(MidiEvent.Meta, 0x2F, 0, Encoding.Default.GetBytes(""))));
+            var track_sys = GetMetaTrack(FileName);
             result.AddTrack(track_sys);
 
             var track = new MidiTrack();

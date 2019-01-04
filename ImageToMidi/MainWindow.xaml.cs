@@ -100,9 +100,7 @@ namespace ImageToMidi
                     if (img is BitmapSource)
                     {
                         bitmap = PixelMidi.ImageSourceToBitmap(img as BitmapSource);
-                        bitmap = PixelMidi.GrayScale(bitmap);
-                        image.Source = PixelMidi.BitmapToImageSource(bitmap);
-                        p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
+                        image.Source = PixelMidi.BitmapToImageSource(PixelMidi.GrayScale(bitmap));
                     }
                 }
             }
@@ -114,9 +112,7 @@ namespace ImageToMidi
             if (source is BitmapSource)
             {
                 bitmap = PixelMidi.ImageSourceToBitmap(source as BitmapSource);
-                bitmap = PixelMidi.GrayScale(bitmap);
-                image.Source = PixelMidi.BitmapToImageSource(bitmap);
-                p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
+                image.Source = PixelMidi.BitmapToImageSource(PixelMidi.GrayScale(bitmap));
             }
         }
 
@@ -127,11 +123,10 @@ namespace ImageToMidi
                 if (stream is Stream)
                 {
                     if (IsDib)
-                        bitmap = PixelMidi.GrayScale(BitmapFromDib(stream));
+                        bitmap = BitmapFromDib(stream);
                     else
-                        bitmap = PixelMidi.GrayScale(new System.Drawing.Bitmap(stream));
-                    image.Source = PixelMidi.BitmapToImageSource(bitmap);
-                    p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
+                        bitmap = new System.Drawing.Bitmap(stream);
+                    image.Source = PixelMidi.BitmapToImageSource(PixelMidi.GrayScale(bitmap));
                 }
             }
             catch (Exception) { }
@@ -161,10 +156,10 @@ namespace ImageToMidi
             {
                 p2m.FileName = System.IO.Path.GetFileNameWithoutExtension(text);
 
-                bitmap = PixelMidi.GrayScale(PixelMidi.LoadBitmap(text));
-                image.Source = PixelMidi.BitmapToImageSource(bitmap);
+                bitmap = PixelMidi.LoadBitmap(text);
+                image.Source = PixelMidi.BitmapToImageSource(PixelMidi.GrayScale(bitmap));
 
-                p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
+                //p2m.GetPixelMidi(bitmap, !MultiTrack.IsChecked.Value);
             }
         }
 
@@ -243,8 +238,16 @@ namespace ImageToMidi
             dlgSave.FileName = $"{p2m.FileName}.mid";
             if (dlgSave.ShowDialog() == true)
             {
-                p2m.GetMidi(bitmap, !MultiTrack.IsChecked.Value);
-                p2m.Save($"{dlgSave.FileName}");
+                if(sender == btnSavePixelMidi)
+                {
+                    p2m.GetPixelMidi(bitmap, !MultiTrack.IsChecked.Value);
+                    p2m.Save($"{dlgSave.FileName}");
+                }
+                else if(sender == btnSaveHistMidi)
+                {
+                    p2m.GetHistogramMidi(bitmap, !MultiTrack.IsChecked.Value);
+                    p2m.Save($"{dlgSave.FileName}");
+                }
             }
         }
 
@@ -256,12 +259,13 @@ namespace ImageToMidi
 
         private void btnPlay_Click(object sender, RoutedEventArgs e)
         {
-            if (p2m.IsPlay)
+            //if (p2m.IsPlay)
+            if (sender == btnStop)
             {
                 p2m.Stop();
                 btnPlay.Content = "Play MIDI";
             }
-            else
+            else if(sender == btnPlay)
             {
                 p2m.Play();
                 btnPlay.Content = "Stop MIDI";
@@ -388,7 +392,7 @@ namespace ImageToMidi
             p2m.InvertSource = InvertImage.IsChecked.Value;
             if(p2m.InvertSource) image.Source = PixelMidi.BitmapToImageSource(PixelMidi.Invert(bitmap));
             else image.Source = PixelMidi.BitmapToImageSource(bitmap);
-            p2m.GetMidi(bitmap);
+            //p2m.GetPixelMidi(bitmap);
         }
     }
 }
